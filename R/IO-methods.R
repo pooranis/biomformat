@@ -85,7 +85,7 @@ read_biom <- function(biom_file){
 ################################################################################
 #' Write a biom-format v1 file, returning a \code{biom-class}.
 #'
-#' @param x (Required). A biom object that is going to be written to file
+#' @param biom (Required). A biom object that is going to be written to file
 #'  as a proper biom formatted file, adhering to 
 #'  \href{http://biom-format.org/documentation/biom_format.html}{the biom-format definition}.
 #'  
@@ -94,6 +94,8 @@ read_biom <- function(biom_file){
 #'  specific to biological datasets. 
 #'  The format is formally defined at 
 #'  \href{http://biom-format.org/documentation/biom_format.html}{the biom-format definition}
+#'  
+#' @param pretty logical; Should biom output be pretty printed?
 #'
 #' @return Nothing. The first argument, \code{x}, is written to a file.
 #'
@@ -112,17 +114,18 @@ read_biom <- function(biom_file){
 #' @references \url{http://biom-format.org/}
 #'
 #' @export
-#' @importFrom jsonlite toJSON
+#' @importFrom jsonlite toJSON write_json
 #' @examples
 #' biom_file <- system.file("extdata", "rich_sparse_otu_table.biom", package = "biomformat")
 #' x = read_biom(biom_file)
 #' outfile = tempfile()
 #' write_biom(x, outfile)
 #' y = read_biom(outfile)
-#' identical(x, y) 
-write_biom <- function(x, biom_file){
-	cat(toJSON(x), file=biom_file)
+#' identical(x, y)
+write_biom <- function(biom, biom_file, pretty=FALSE) {
+  write_json(biom, path=biom_file, pretty=pretty, auto_unbox = TRUE, na = "string")
 }
+
 ################################################################################
 #' Read in a biom-format vs 2 file, returning a \code{list}.
 #'
