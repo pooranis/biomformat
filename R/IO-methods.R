@@ -185,3 +185,77 @@ read_hdf5_biom<-function(biom_file){
 		rows,columns,shape,data)
 }
 ################################################################################
+
+#' write string variables to scalar hdf5 space
+#'
+#' @param attr Character string.  Attribute to be saved.
+#' @param h5obj An object of class H5IdComponent representing a H5 object identifier (file, group, or dataset). See H5Fcreate, H5Fopen, H5Gcreate, H5Gopen, H5Dcreate, or H5Dopen to create an object of this kind.
+#' @param name Character string. Name of attribute.
+#'
+#' @return
+#' @export
+#' @importFrom rhdf5 H5Screate H5Tcopy H5Tset_size H5Acreate H5Awrite H5Aclose H5Sclose
+#'
+#' @examples
+h5writeAttribute.scalar <- function(attr, h5obj, name) {
+  h5space4 = H5Screate("H5S_SCALAR")
+  typeid <- H5Tcopy("H5T_C_S1")
+  H5Tset_size(typeid, size=nchar(attr)+1)
+  ga <- H5Acreate(h5obj, name, typeid, h5space4)
+  ccc <- H5Awrite(ga, attr)
+  H5Aclose(ga)
+  H5Sclose(h5space4)
+  
+}
+
+
+
+#' Write biom file in HDF5 format
+#'
+#' @param biom A biom object.
+#' @param file A character string indicating the 
+#'  file location of the biom formatted file. This is a HDF5 formatted file
+#'  specific to biological datasets. 
+#'  The format is formally defined at 
+#'  \href{http://biom-format.org/documentation/biom_format.html}{the biom-format definition}
+#'
+#' @return
+#' @export
+#'
+#' @examples
+write_biom_hdf5 <- function(biom, file) {
+  observation <- list()
+  sample <- list()
+  
+  observation$`group-metadata` <- list()
+  sample$`group-metadata` <- list()
+  observation$ids <- as.array(unlist(lapply(biom$rows, function(x) x$id)))
+  y <- attributes(as(as.matrix(biom_data(biom)), "dgRMatrix"))
+  observation$matrix <- list(data=y$x, indices=y$j, indptr=y$p )
+  shape <- dim(biom_data(biom))
+  observation$metadata$taxonomy <- as.matrix(t(observation_metadata(biom)))
+  rownames(observation$metadata$taxonomy) <- NULL
+  colnames(observation$metadata$taxonomy) <- NULL
+  
+  sample$ids <- as.array(unlist(lapply(biom$columns, function(x) x$id)))
+  y <- attributes(as(as.matrix(biom_data(biom)), "dgCMatrix"))
+  sample$matrix <- list(data=y$x, indices=y$i, indptr=y$p )
+  sample$metadata <- as.list(sample_metadata(biom))
+  
+  if (file.exists(file)) file.remove(file)
+  loc <- H5Fcreate(file)
+  print(loc)
+  h5save(observation, sample, file=file, createnewfile = FALSE)
+  
+  atts <- list(biom$date, biom$format_url, c(2,1), biom$generated_by, "No Table ID", length(sample$matrix$data), shape, x3$type)
+  names(atts) <- c("creation-date", "format-url", "format-version", "generated-by", "id", "nnz", "shape", "type")
+  
+  lapply(c(1,2,4,5,8),function (x) h5writeAttribute.scalar(atts[[x]], loc, names(atts)[x]) )
+  lapply(c(3,7),function (x) h5writeAttribute(atts[[x]], loc, names(atts)[x]) )
+  h5writeAttribute.integer(atts[[6]], loc, names(atts)[6])
+  H5close()
+  
+  out <- list(observation=observation, sample=sample)
+  attributes(out) <- atts
+  invisible(out)
+  
