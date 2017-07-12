@@ -259,3 +259,4 @@ write_biom_hdf5 <- function(biom, file) {
   attributes(out) <- atts
   invisible(out)
   
+}

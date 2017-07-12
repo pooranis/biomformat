@@ -61,11 +61,11 @@
 setGeneric("biom", function(x) standardGeneric("biom"))
 #' @rdname biom-methods
 setMethod("biom", c("list"), function(x){
-	# Some instantiation checks chould go here, 
+  # Some instantiation checks chould go here, 
   # or wrap them in validity methods.
-	# Depends on how strict the check should be.
-	biom = new("biom", x)
-	return(biom)
+  # Depends on how strict the check should be.
+  biom = new("biom", x)
+  return(biom)
 })
 ################################################################################
 #' Create a \code{\link{biom-class}} 
@@ -118,6 +118,12 @@ setMethod("biom", c("list"), function(x){
 #'
 #' @param matrix_element_type (Optional). Character string. Either 'int' or 'float'
 #' 
+#' @param qiime_format (Optional). Logical. biom-format requires that observation 
+#' metadata be key, value pairs (or group, 
+#'  dataset for hd5).  For QIIME, there is only one pair with key be set to "taxonomy,"
+#'  and the value must be the entire taxonomy table.  If FALSE, each column of observation
+#'  metadata will be a separate key (to be consistent with sample metadata).
+#' 
 #' @return An object of \code{\link{biom-class}}.
 #'
 #' @references \url{http://biom-format.org/}
@@ -162,7 +168,7 @@ setMethod("biom", c("list"), function(x){
 #' identical(observation_metadata(x1), observation_metadata(y1))
 #' identical(sample_metadata(x1), sample_metadata(y1))
 #' identical(biom_data(x1), biom_data(y1))
-make_biom <- function(data, sample_metadata=NULL, observation_metadata=NULL, id=NULL, matrix_element_type="int"){
+make_biom <- function(data, sample_metadata=NULL, observation_metadata=NULL, id=NULL, matrix_element_type="int", qiime_format=TRUE){
   # The observations / features / OTUs / rows "meta" data table
   if(!is.null(observation_metadata)){
     rows = mapply(list, SIMPLIFY=FALSE, id=as.list(rownames(data)),
@@ -183,20 +189,33 @@ make_biom <- function(data, sample_metadata=NULL, observation_metadata=NULL, id=
   # Define the list, instantiate as biom-format, and return
   # (Might eventually expose some of these list elements as function arguments)
   format_url = "http://biom-format.org/documentation/format_versions/biom-1.0.html"
-  return(biom(list(id=id,
-                   format = "Biological Observation Matrix 1.0.0-dev",
-                   format_url = format_url,
-                   type = "OTU table",
-                   generated_by = sprintf("biomformat %s", packageVersion("biomformat")),
-                   date = as.character(Sys.time()),
-                   matrix_type = "dense",
-                   matrix_element_type = matrix_element_type,
-                   shape = dim(data),
-                   rows = rows,
-                   columns = columns,
-                   data = datalist)
-  ))
+  biomout <- biom(list(id=id,
+                       format = "Biological Observation Matrix 1.0.0",
+                       format_url = format_url,
+                       type = "OTU table",
+                       generated_by = sprintf("biomformat %s", packageVersion("biomformat")),
+                       date = strftime(Sys.time(), format="%Y-%m-%dT%H:%M:%S"),
+                       matrix_type = "dense",
+                       matrix_element_type = matrix_element_type,
+                       shape = dim(data),
+                       rows = rows,
+                       columns = columns,
+                       data = datalist))
+  if (!is.null(observation_metadata)) {
+    if (qiime_format) {
+      biomout$rows <- lapply(biomout$rows, function(x) { mm <- x$metadata; x$metadata <- NULL; x$metadata$taxonomy <- mm; x })
+    } else {
+      biomout$rows <- lapply(biomout$rows, function(x) { x$metadata <- as.list(x$metadata); return(x) })
+    }
+  }
+  
+  if (!is.null(sample_metadata)) {
+    biomout$columns <- lapply(biomout$columns, function(x) { x$metadata <- as.list(x$metadata); return(x) })
+  }
+  
+  return(biomout)
 }
+
 ################################################################################
 #' Method extensions to show for biom objects.
 #'
@@ -217,10 +236,10 @@ make_biom <- function(data, sample_metadata=NULL, observation_metadata=NULL, id=
 #' (x = read_biom(biom_file) )
 #' show(x)
 setMethod("show", "biom", function(object){
-	cat("biom object. \n")
-	cat("type:", object$type, "\n")
-	cat("matrix_type:", object$matrix_type, "\n")
-	cat(biom_shape(object)[1], "rows and", biom_shape(object)[2], "columns \n")
+  cat("biom object. \n")
+  cat("type:", object$type, "\n")
+  cat("matrix_type:", object$matrix_type, "\n")
+  cat(biom_shape(object)[1], "rows and", biom_shape(object)[2], "columns \n")
 })
 ################################################################################
 #' Extract the header from a \code{\link{biom-class}} object as a list. 
@@ -241,9 +260,9 @@ setMethod("show", "biom", function(object){
 setGeneric("header", function(x) standardGeneric("header"))
 #' @rdname header-methods
 setMethod("header", c("biom"), function(x){
-	biomheadkeys = c("id", "format", "format_url", "type", "generated_by", "date",
-									 "matrix_type", "matrix_element_type", "shape")
-	return(x[biomheadkeys])	
+  biomheadkeys = c("id", "format", "format_url", "type", "generated_by", "date",
+                   "matrix_type", "matrix_element_type", "shape")
+  return(x[biomheadkeys])	
 })
 ################################################################################
 #' The matrix dimensions
@@ -270,7 +289,7 @@ setMethod("header", c("biom"), function(x){
 setGeneric("biom_shape", function(x) standardGeneric("biom_shape"))
 #' @rdname biom_shape-methods
 setMethod("biom_shape", c("biom"), function(x){
-	return(as(c(nrow=x$shape[1], ncol=x$shape[2]), "integer"))
+  return(as(c(nrow=x$shape[1], ncol=x$shape[2]), "integer"))
 })
 ################################################################################
 #' Access class of data in the matrix elements
@@ -297,7 +316,7 @@ setMethod("biom_shape", c("biom"), function(x){
 setGeneric("matrix_element_type", function(x) standardGeneric("matrix_element_type"))
 #' @rdname matrix_element_type-methods
 setMethod("matrix_element_type", c("biom"), function(x){
-	return(x$matrix_element_type)
+  return(x$matrix_element_type)
 })
 ################################################################################
 #' Method extensions to \code{\link[base]{nrow}}
@@ -328,7 +347,7 @@ setMethod("matrix_element_type", c("biom"), function(x){
 #' (x = read_biom(biom_file) )
 #' nrow(x)
 setMethod("nrow", c("biom"), function(x){
-	return( biom_shape(x)["nrow"] )
+  return( biom_shape(x)["nrow"] )
 })
 ################################################################################
 #' Method extensions to \code{\link[base]{ncol}}
@@ -359,7 +378,7 @@ setMethod("nrow", c("biom"), function(x){
 #' (x = read_biom(biom_file) )
 #' ncol(x)
 setMethod("ncol", c("biom"), function(x){
-	return( biom_shape(x)["ncol"] )
+  return( biom_shape(x)["ncol"] )
 })
 ################################################################################
 #' Method extensions to \code{\link[base]{rownames}}
@@ -389,7 +408,7 @@ setMethod("ncol", c("biom"), function(x){
 #' (x = read_biom(biom_file) )
 #' rownames(x)
 setMethod("rownames", c("biom"), function(x){
-	sapply(x$rows, function(i) i$id)
+  sapply(x$rows, function(i) i$id)
 })
 ################################################################################
 #' Method extensions to \code{\link[base]{colnames}}
@@ -419,7 +438,7 @@ setMethod("rownames", c("biom"), function(x){
 #' (x = read_biom(biom_file) )
 #' colnames(x)
 setMethod("colnames", c("biom"), function(x){
-	sapply(x$columns, function(i) i$id)
+  sapply(x$columns, function(i) i$id)
 })
 ################################################################################
 #' Access main data observation matrix data from \code{\link{biom-class}}. 
@@ -527,9 +546,9 @@ setMethod("biom_data", c("biom", "numeric", "numeric"), function(x, rows, column
     # If matrix is stored as dense, create "vanilla" R matrix, m
     m = laply(x$data[rows], function(i) i[columns], .parallel=parallel) 
     if( length(rows) > 1L &
-    		length(columns) > 1L &
-    		matrix_element_type(x) %in% c("int", "float")
-    	){
+        length(columns) > 1L &
+        matrix_element_type(x) %in% c("int", "float")
+    ){
       # If either dimension is length-one, don't call coerce to "Matrix"
       # Note that laply() does still work in this case.
       # If both dimension lengths > 1 & data is numeric, 
@@ -554,8 +573,8 @@ setMethod("biom_data", c("biom", "numeric", "numeric"), function(x, rows, column
       # Create an assignment data.frame.
       # Is slightly more complicated for sparse JSON w/ character values
       adf = ldply(x$data, function(x){
-                data.frame(r=x[[1]], c=x[[2]], data=x[[3]], stringsAsFactors=FALSE)
-            })
+        data.frame(r=x[[1]], c=x[[2]], data=x[[3]], stringsAsFactors=FALSE)
+      })
     }
     colnames(adf) <- c("r", "c", "data")
     # indices start at 0 in biom sparse format, 
@@ -570,7 +589,7 @@ setMethod("biom_data", c("biom", "numeric", "numeric"), function(x, rows, column
     m[as(adf[, 1:2], "matrix")] <- adf$data
     # Subset this biggest-size m to just `rows` and `columns`
     m = m[rows, columns]
-  # End sparse section
+    # End sparse section
   }   
   # Add row and column names
   if( identical(length(rows), 1L) | identical(length(columns), 1L) ){
@@ -640,32 +659,32 @@ setMethod("biom_data", c("biom", "numeric", "numeric"), function(x, rows, column
 #' sample_metadata(x5)
 #' sample_metadata(x6)
 setGeneric("sample_metadata", function(x, columns, parallel=FALSE){
-	standardGeneric("sample_metadata")
+  standardGeneric("sample_metadata")
 })
 # All methods funnel toward signature biom,numeric
 #' @rdname sample_metadata-methods
 setMethod("sample_metadata", c("biom", "missing"), function(x, columns, parallel=FALSE){
-	# Dispatch with full rows and cols
-	sample_metadata(x, 1:ncol(x), parallel)
+  # Dispatch with full rows and cols
+  sample_metadata(x, 1:ncol(x), parallel)
 })
 #' @rdname sample_metadata-methods
 setMethod("sample_metadata", c("biom", "character"), function(x, columns, parallel=FALSE){
-	columns = which(sapply(x$columns, function(j) j$id) %in% columns)
-	if( length(columns)==0 ){
-		stop("The column ID names you provided do not match the column IDs in x")
-	}
-	# Dispatch with specified numeric columns
-	sample_metadata(x, columns, parallel)
+  columns = which(sapply(x$columns, function(j) j$id) %in% columns)
+  if( length(columns)==0 ){
+    stop("The column ID names you provided do not match the column IDs in x")
+  }
+  # Dispatch with specified numeric columns
+  sample_metadata(x, columns, parallel)
 })
 #' @rdname sample_metadata-methods
 setMethod("sample_metadata", c("biom", "numeric"), function(x, columns, parallel=FALSE){
-	if( any(columns > ncol(x)) ){
-		warning(paste0("column indices ",
-									 paste0(columns[columns > ncol(x)], collapse=" "),
-									 " are greater than available columns in data. They were ignored."))
-		columns = columns[columns <= ncol(x)]
-	}
-	return(extract_metadata(x, "columns", columns, parallel))
+  if( any(columns > ncol(x)) ){
+    warning(paste0("column indices ",
+                   paste0(columns[columns > ncol(x)], collapse=" "),
+                   " are greater than available columns in data. They were ignored."))
+    columns = columns[columns <= ncol(x)]
+  }
+  return(extract_metadata(x, "columns", columns, parallel))
 })
 ################################################################################
 #' Access observation (row) meta data from \code{\link{biom-class}}. 
@@ -720,32 +739,32 @@ setMethod("sample_metadata", c("biom", "numeric"), function(x, columns, parallel
 #' observation_metadata(x5)
 #' observation_metadata(x6)
 setGeneric("observation_metadata", function(x, rows, parallel=FALSE){
-	standardGeneric("observation_metadata")
+  standardGeneric("observation_metadata")
 })
 # All methods funnel toward signature biom,numeric
 #' @rdname observation_metadata-methods
 setMethod("observation_metadata", c("biom", "missing"), function(x, rows, parallel=FALSE){
-	# Dispatch with full rows and cols
-	observation_metadata(x, 1:nrow(x), parallel)
+  # Dispatch with full rows and cols
+  observation_metadata(x, 1:nrow(x), parallel)
 })
 #' @rdname observation_metadata-methods
 setMethod("observation_metadata", c("biom", "character"), function(x, rows, parallel=FALSE){
-	rows = which(sapply(x$rows, function(j) j$id) %in% rows)
-	if( length(rows)==0 ){
-		stop("The row ID names you provided do not match the row IDs in x")
-	}
-	# Dispatch with specified numeric rows
-	observation_metadata(x, rows, parallel)
+  rows = which(sapply(x$rows, function(j) j$id) %in% rows)
+  if( length(rows)==0 ){
+    stop("The row ID names you provided do not match the row IDs in x")
+  }
+  # Dispatch with specified numeric rows
+  observation_metadata(x, rows, parallel)
 })
 #' @rdname observation_metadata-methods
 setMethod("observation_metadata", c("biom", "numeric"), function(x, rows, parallel=FALSE){
-	if( any(rows > nrow(x)) ){
-		warning(paste0("Row indices ",
-									 paste0(rows[rows > nrow(x)], collapse=" "),
-									 " are greater than available rows in data. They were ignored."))
-		rows = rows[rows <= nrow(x)]
-	}
-	return(extract_metadata(x, "rows", rows, parallel))
+  if( any(rows > nrow(x)) ){
+    warning(paste0("Row indices ",
+                   paste0(rows[rows > nrow(x)], collapse=" "),
+                   " are greater than available rows in data. They were ignored."))
+    rows = rows[rows <= nrow(x)]
+  }
+  return(extract_metadata(x, "rows", rows, parallel))
 })
 ################################################################################
 # Generic internal function for extracting metadata from either rows or columns
@@ -753,32 +772,32 @@ setMethod("observation_metadata", c("biom", "numeric"), function(x, rows, parall
 #' @importFrom plyr llply
 #' @keywords internal
 extract_metadata = function(x, indextype, indices, parallel=FALSE){
-	# Immediately extract just those index indicated by `index` argument
-	metalist = x[[indextype]][indices]
-	# Extract metadata elements as a list, for checking dimensions, NULL, etc.
-	rx = llply(metalist, function(i) unlist(i$metadata), .parallel=parallel)
-	if( all(sapply(rx, is.null)) ){
-		# If there is no metadata (all NULL),
-		# then set metadata to NULL, representing empty.
-		metadata = NULL
-	} else {
-		# Else, extract names and metadata (both required)
-		# Extract names
-		metaids = sapply(metalist, function(i) i$id)
-		# Test if length of metadata entries is same for all indices.
-		rxlengths = sapply(rx, length)
-		if( all( rxlengths == rxlengths[1]) ){
-			# If so, can parse it as data.frame with ldply
-			# return a data.frame with colnames
-			metadata = ldply(rx, .parallel=parallel)
-			rownames(metadata) <- metaids
-		} else {
-			# Else, should keep it as a list. But should name the entries
-			metadata = rx
-			names(metadata) <- metaids
-		}
-	}
-	return(metadata)
+  # Immediately extract just those index indicated by `index` argument
+  metalist = x[[indextype]][indices]
+  # Extract metadata elements as a list, for checking dimensions, NULL, etc.
+  rx = llply(metalist, function(i) unlist(i$metadata), .parallel=parallel)
+  if( all(sapply(rx, is.null)) ){
+    # If there is no metadata (all NULL),
+    # then set metadata to NULL, representing empty.
+    metadata = NULL
+  } else {
+    # Else, extract names and metadata (both required)
+    # Extract names
+    metaids = sapply(metalist, function(i) i$id)
+    # Test if length of metadata entries is same for all indices.
+    rxlengths = sapply(rx, length)
+    if( all( rxlengths == rxlengths[1]) ){
+      # If so, can parse it as data.frame with ldply
+      # return a data.frame with colnames
+      metadata = ldply(rx, .parallel=parallel)
+      rownames(metadata) <- metaids
+    } else {
+      # Else, should keep it as a list. But should name the entries
+      metadata = rx
+      names(metadata) <- metaids
+    }
+  }
+  return(metadata)
 }
 ################################################################################
 # Generic internal function for generating the count matrix.
@@ -788,19 +807,19 @@ generate_matrix <- function(x){
   indices = x$sample$matrix$indices+1
   data    = x$sample$matrix$data
   nr = length(x$observation$ids)
- 
+  
   counts = sapply(2:length(indptr),function(i){
     x = rep(0,nr)
     seq = indptr[i-1]:(indptr[i]-1)
     x[indices[seq]] = data[seq]
     x
-    })
+  })
   rownames(counts) = x$observation$ids
   colnames(counts) = x$sample$ids
   # I wish this next line wasn't necessary
   lapply(1:nrow(counts),function(i){
     counts[i,]
-    })
+  })
 }
 ################################################################################
 # Generic internal function for generating the metadata.
@@ -808,22 +827,22 @@ generate_matrix <- function(x){
 generate_metadata <- function(x){
   metadata = x$metadata
   metadata = lapply(1:length(x$ids),function(i){
-      id_metadata = lapply(metadata,function(j){
-        if(length(dim(j))>1){ as.vector(j[,i,drop=FALSE]) }
-        else{ j[i] }
-          })
-      list(id = x$ids[i],metadata=id_metadata)
+    id_metadata = lapply(metadata,function(j){
+      if(length(dim(j))>1){ as.vector(j[,i,drop=FALSE]) }
+      else{ j[i] }
     })
+    list(id = x$ids[i],metadata=id_metadata)
+  })
   return(metadata)
 }
 ################################################################################
 # Generic internal function for generating a named list. 
 #' @keywords internal
 namedList <- function(...) {
-    L <- list(...)
-    snm <- sapply(substitute(list(...)),deparse)[-1]
-    if (is.null(nm <- names(L))) nm <- snm
-    if (any(nonames <- nm=="")) nm[nonames] <- snm[nonames]
-    setNames(L,nm)
+  L <- list(...)
+  snm <- sapply(substitute(list(...)),deparse)[-1]
+  if (is.null(nm <- names(L))) nm <- snm
+  if (any(nonames <- nm=="")) nm[nonames] <- snm[nonames]
+  setNames(L,nm)
 }
 ################################################################################

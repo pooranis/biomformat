@@ -20,3 +20,4 @@ VignetteBuilder: knitr
 Collate: 'allClasses.R' 'allPackage.R' 'IO-methods.R' 'BIOM-class.R' 'validity-methods.R'
 biocViews: DataImport, Metagenomics, Microbiome
 NeedsCompilation: no
+RoxygenNote: 6.0.1
