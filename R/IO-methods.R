@@ -223,7 +223,7 @@ h5writeAttribute.scalar <- function(attr, h5obj, name) {
 #' @export
 #'
 #' @examples
-write_biom_hdf5 <- function(biom, file) {
+write_hdf5_biom <- function(biom, file) {
   observation <- list()
   sample <- list()
   
