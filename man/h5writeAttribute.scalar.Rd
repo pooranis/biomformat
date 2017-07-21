@@ -4,7 +4,7 @@
 \alias{h5writeAttribute.scalar}
 \title{write string variables to scalar hdf5 space}
 \usage{
-h5writeAttribute.scalar(attr, h5obj, name)
+\method{h5writeAttribute}{scalar}(attr, h5obj, name)
 }
 \arguments{
 \item{attr}{Character string.  Attribute to be saved.}
