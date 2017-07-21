@@ -247,7 +247,7 @@ write_hdf5_biom <- function(biom, file) {
   print(loc)
   h5save(observation, sample, file=file, createnewfile = FALSE)
   
-  atts <- list(biom$date, biom$format_url, c(2,1), biom$generated_by, "No Table ID", length(sample$matrix$data), shape, x3$type)
+  atts <- list(biom$date, biom$format_url, c(2,1), biom$generated_by, "No Table ID", length(sample$matrix$data), shape, biom$type)
   names(atts) <- c("creation-date", "format-url", "format-version", "generated-by", "id", "nnz", "shape", "type")
   
   lapply(c(1,2,4,5,8),function (x) h5writeAttribute.scalar(atts[[x]], loc, names(atts)[x]) )
