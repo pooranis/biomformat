@@ -123,7 +123,7 @@ read_biom <- function(biom_file){
 #' y = read_biom(outfile)
 #' identical(x, y)
 write_biom <- function(biom, biom_file, pretty=FALSE) {
-  write_json(biom, path=biom_file, pretty=pretty, auto_unbox = TRUE, na = NULL)
+  write_json(biom, path=biom_file, pretty=pretty, auto_unbox = TRUE, na = "null")
 }
 
 ################################################################################
